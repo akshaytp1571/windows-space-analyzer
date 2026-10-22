@@ -1,0 +1,4 @@
+# Runtime dependencies for Windows Space Analyzer.
+# Windows 10 or 11 with Python 3.10 or newer.
+PySide6>=6.6,<7
+send2trash>=1.8

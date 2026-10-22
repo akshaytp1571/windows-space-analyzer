@@ -1,0 +1,10 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a safety or data-loss bug
+    url: https://github.com/akshaytp1571/windows-space-analyzer/security/advisories/new
+    about: >
+      If the app deleted something it should not have, or bypassed a safety rule,
+      report it privately here rather than in a public issue.
+  - name: Read the safety model
+    url: https://github.com/akshaytp1571/windows-space-analyzer/blob/main/docs/SAFETY.md
+    about: Exactly what the app refuses to delete, and the known limitations.

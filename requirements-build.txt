@@ -1,0 +1,3 @@
+# Extra tool needed only to build the .exe with build_exe.bat.
+-r requirements.txt
+pyinstaller>=6.0

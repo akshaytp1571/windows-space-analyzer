@@ -1,0 +1,11 @@
+# Normalise line endings so the repo behaves the same on every platform.
+* text=auto eol=lf
+
+# Windows batch files must keep CRLF or cmd.exe misparses them.
+*.bat text eol=crlf
+
+# Images are binary.
+*.png binary
+*.ico binary
+*.jpg binary
+*.webp binary
