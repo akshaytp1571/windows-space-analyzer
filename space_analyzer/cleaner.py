@@ -77,12 +77,26 @@ def delete_to_recycle(
         report.messages.append("Dry run. Nothing was changed.")
         return report
     if valid:
-        _say(progress, f"Sending {len(valid)} item(s) to the Recycle Bin")
-        send = recycler if recycler is not None else recycle.send_to_recycle_bin
-        sent, failed = send(list(valid))
-        report.failed.extend(failed)
-        report.removed_count = len(sent)
-        report.bytes_removed = sum(sizes.get(path, 0) for path in sent)
+        # Re-check each path immediately before the move. The first check happened while
+        # sizing the paths, and the file system can change in between: a path that has
+        # become a link, or that now resolves somewhere else, must not be moved. This
+        # narrows the window to the gap between this loop and the send call itself.
+        rechecked: list[str] = []
+        for path in valid:
+            reason = safety.validate_target(
+                path, allowed_roots, protected=protected, allowlist=allowlist
+            )
+            if reason is not None:
+                report.failed.append(ActionFailure(path, reason))
+                continue
+            rechecked.append(path)
+        if rechecked:
+            _say(progress, f"Sending {len(rechecked)} item(s) to the Recycle Bin")
+            send = recycler if recycler is not None else recycle.send_to_recycle_bin
+            sent, failed = send(list(rechecked))
+            report.failed.extend(failed)
+            report.removed_count = len(sent)
+            report.bytes_removed = sum(sizes.get(path, 0) for path in sent)
     return report
 
 
@@ -215,6 +229,17 @@ def _clean_windows_old(
     cancel: threading.Event | None,
 ) -> None:
     """Run Windows Disk Cleanup for the Windows.old category only."""
+    # Check the target before touching the registry or running cleanmgr. Windows.old is a
+    # top-level folder, which validate_target refuses by design, so it has its own check:
+    # the path must be exactly this PC's Windows.old and nothing else.
+    if not item.paths:
+        report.failed.append(ActionFailure(item.title, "No Windows.old folder to remove"))
+        return
+    for path in item.paths:
+        reason = safety.validate_windows_old(path)
+        if reason is not None:
+            report.failed.append(ActionFailure(path, reason))
+            return
     code, out, err = system.run_command(["reg", "query", _VOLUME_CACHES], timeout=_COMMAND_TIMEOUT)
     if code != 0:
         report.failed.append(ActionFailure(

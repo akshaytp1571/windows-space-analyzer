@@ -7,6 +7,40 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- **`Windows.old` is now path-checked.** `CLEAN_WINDOWS_OLD` previously reached the
+  registry and `cleanmgr` without validating its target. It cannot use
+  `validate_target` because `Windows.old` is itself a top-level folder, which that
+  function refuses by design, so it now uses `safety.validate_windows_old`: the
+  path must be exactly this PC's `Windows.old`, not a link, and still a folder. The
+  check runs before any system change.
+- **Re-validated before the move.** `delete_to_recycle` now validates each path a
+  second time immediately before sending it to the Recycle Bin, so a file that
+  became a link, or that now resolves elsewhere, between sizing and the move is
+  dropped and reported instead of moved. This narrows the TOCTOU window to the gap
+  between the second check and the `send2trash` call.
+
+### Changed
+
+- Documentation no longer describes either of the above as an open gap.
+  `docs/ARCHITECTURE.md` safety rules 1, 4, 9 and 11 are scoped to what the code
+  actually enforces.
+- The v1.0.0 release now ships `WindowsSpaceAnalyzer.exe` (49.1 MB), built and
+  launched to verify it starts. Its SHA-256 is published in the README.
+
+### Tests
+
+- Added `tests/test_safety.py::ValidateWindowsOldTests` (7 tests) covering every
+  refusal `validate_windows_old` makes.
+- Added a TOCTOU regression test that swaps a path to a link after sizing and
+  asserts it never reaches the recycler. Verified it fails when the re-check is
+  removed, so it guards the fix rather than merely passing alongside it.
+- Replaced the timing-based `_wait_idle` helper in `tests/test_suggestions_page.py`
+  with one that waits on the worker itself. The old helper used a fixed idle count
+  and could race a page that chains a second worker from the first one's signal,
+  which made `test_accepting_the_bin_offer_empties_the_bin` fail intermittently.
+
 ## [1.0.0] — 2026-10-22
 
 First public release.

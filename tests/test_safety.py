@@ -126,5 +126,64 @@ class ValidateTargetTests(unittest.TestCase):
         )
 
 
+class ValidateWindowsOldTests(unittest.TestCase):
+    """validate_windows_old: the one path CLEAN_WINDOWS_OLD is defined to target.
+
+    Windows.old is a top-level folder on the system drive, so validate_target refuses it
+    by design. This check is what stands in for it, and it is deliberately strict: only
+    the exact folder on this PC may pass.
+    """
+
+    def setUp(self) -> None:
+        self.root = os.path.realpath(tempfile.mkdtemp(prefix="space_windows_old_test_"))
+        self.addCleanup(shutil.rmtree, self.root, True)
+        self.disk = os.path.join(self.root, "disk")
+        self.windows_old = os.path.join(self.disk, "Windows.old")
+        os.makedirs(self.windows_old)
+        patcher = mock.patch.object(system, "system_drive", return_value=self.disk + os.sep)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_the_windows_old_folder_on_this_pc_is_allowed(self) -> None:
+        self.assertIsNone(safety.validate_windows_old(self.windows_old))
+
+    def test_a_trailing_separator_still_matches(self) -> None:
+        self.assertIsNone(safety.validate_windows_old(self.windows_old + os.sep))
+
+    def test_a_different_top_level_folder_is_refused(self) -> None:
+        other = os.path.join(self.disk, "NotWindowsOld")
+        os.makedirs(other)
+        self.assertEqual(
+            safety.validate_windows_old(other),
+            "Not the Windows.old folder on this PC",
+        )
+
+    def test_a_folder_inside_windows_old_is_refused(self) -> None:
+        inner = os.path.join(self.windows_old, "Windows")
+        os.makedirs(inner)
+        self.assertEqual(
+            safety.validate_windows_old(inner),
+            "Not the Windows.old folder on this PC",
+        )
+
+    def test_an_empty_path_is_refused(self) -> None:
+        self.assertEqual(safety.validate_windows_old(""), "No path given")
+
+    def test_a_missing_windows_old_is_refused(self) -> None:
+        gone = os.path.join(self.disk, "Windows.old")
+        shutil.rmtree(gone)
+        self.assertEqual(
+            safety.validate_windows_old(gone),
+            "Windows.old is no longer a folder",
+        )
+
+    def test_a_link_is_refused(self) -> None:
+        with mock.patch.object(system, "is_link", return_value=True):
+            self.assertEqual(
+                safety.validate_windows_old(self.windows_old),
+                "Links and junctions are not followed",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -42,22 +42,24 @@ This is the part most such documents gloss over. Be clear about it:
 
 | Operation | Goes through `validate_target`? |
 |---|---|
-| Deleting a cleanup item's files (`DELETE_PATHS`) | **Yes**, every path |
+| Deleting a cleanup item's files (`DELETE_PATHS`) | **Yes**, every path, and again before the move |
 | Windows Update cache (`CLEAN_UPDATE_CACHE`) | **Yes**, via an inner `delete_to_recycle` |
-| Files you tick on *Large files* / *Duplicates* | **Yes** |
-| Empty the Recycle Bin | No |
-| Turn hibernation off | No |
-| Delete restore points | No |
-| Remove `Windows.old` | No |
+| Files you tick on *Large files* / *Duplicates* | **Yes**, and again before the move |
+| Empty the Recycle Bin | No — takes no path |
+| Turn hibernation off | No — takes no path |
+| Delete restore points | No — takes no path |
+| Remove `Windows.old` | No — uses the stricter `validate_windows_old` instead |
 
-The four operations in the lower half do not take a path from the app at all.
-They are protected differently, described in the next section. This is a real
-limitation and is stated here rather than hidden.
+The three operations that take no path have nothing for a path validator to check;
+they are protected differently, described in the next section. `Windows.old` does
+have a path, so it gets its own check rather than none.
 
-## How the four permanent actions are protected
+## How the permanent actions are protected
 
-They do not accept a user-supplied path, so there is nothing for a path validator
-to check. Their protection is:
+Three of them — emptying the Recycle Bin, turning hibernation off, and deleting
+restore points — do not accept a user-supplied path, so there is nothing for a path
+validator to check. `Windows.old` does have a path and is checked separately (see
+below). For the three, the protection is:
 
 * **An administrator gate.** Each is refused before it runs when the app is not
   elevated, with the failure `Requires administrator`.
@@ -72,13 +74,18 @@ to check. Their protection is:
   cleanup category explicitly disabled first so only *Previous Installations*
   runs.
 
-### Honest caveat about `Windows.old`
+### `Windows.old` has its own check
 
-`oldwin.windows_old` is the most destructive single action and it has the least
-path validation: because it is not a `DELETE_PATHS` action, its paths are never
-passed to `validate_target`. Its safety rests entirely on the administrator gate
-plus the fact that Windows itself performs the removal. If you are auditing this
-project, that is the place to look hardest.
+`oldwin.windows_old` cannot use `validate_target`, because `Windows.old` **is** a
+top-level folder on the system drive, and rule 3 refuses every top-level folder by
+design. That rule exists to stop a bad cleanup item naming an arbitrary folder, so
+weakening it for this one action would be the wrong fix.
+
+Instead the action has a stricter check, `safety.validate_windows_old`, which
+requires that the path be **exactly this PC's `Windows.old` folder** and nothing
+else. It refuses a different top-level folder, any folder inside `Windows.old`, a
+path that is no longer a folder, and a link. It runs before the registry is touched
+or `cleanmgr` is invoked, so a malformed item cannot reach either.
 
 ## Protected locations, and the allowlist
 
@@ -130,11 +137,12 @@ Reparse points are handled in six independent layers, all keyed on
 `system.is_link` returns `True` when a path cannot be inspected at all, so an
 unreadable target is refused rather than allowed.
 
-**Known limitation:** the link check happens at validation time, and the file is
-moved afterwards. There is no second check between validation and the move. The
-window is small, and this app is not a security boundary against a local attacker
-who already has write access to your files, but it is a real gap and is listed
-here rather than left for you to discover.
+**Re-checked before the move.** `delete_to_recycle` validates each path twice: once
+while measuring it, and again immediately before sending, so a path that became a
+link — or that now resolves somewhere else — in between is dropped and reported
+rather than moved. That narrows the window to the gap between the second check and
+the `send2trash` call itself. It is narrowed, not eliminated: closing it completely
+would need a handle-based delete, which `send2trash` does not offer.
 
 ## Nothing is deleted recursively
 

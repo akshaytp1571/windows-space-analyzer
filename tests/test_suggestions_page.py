@@ -81,21 +81,33 @@ class SuggestionsPageTests(unittest.TestCase):
         self._confirm_calls = getattr(self, "_confirm_calls", 0) + 1
         return self._confirm_calls == 1
 
-    def _wait_idle(self, rounds: int = 600) -> None:
-        """Run the Qt event loop until the page's worker is done.
+    def _wait_idle(self, rounds: int = 2000) -> None:
+        """Run the Qt event loop until the page has no worker left to finish.
 
-        The loop keeps pumping for a few extra rounds after the page goes idle, so a
-        worker the page started from a signal handler has also run to completion.
+        A fixed idle count is not enough: the page can chain a second worker from the
+        first one's signal (the cleanup report, then the empty-bin offer), and there is
+        a moment between the two when _busy is False. This waits for the worker object
+        itself to be finished and gone, then drains the loop so its queued signals are
+        delivered before the assertions run.
         """
-        idle = 0
         for _ in range(rounds):
-            if not self.page._busy:
-                idle += 1
-                if idle >= 20:
-                    break
-            else:
-                idle = 0
+            worker = getattr(self.page, "_worker", None)
+            if worker is None:
+                break
             self.app.processEvents()
+            if not worker.isRunning():
+                # Let the finished handler run, then check again: it may start another.
+                self.app.processEvents()
+                if getattr(self.page, "_worker", None) is not worker:
+                    continue
+                if not worker.isRunning():
+                    break
+            time.sleep(0.005)
+        # Drain whatever the last signal queued, so status text and reports are applied.
+        for _ in range(50):
+            self.app.processEvents()
+            if not self.page._busy:
+                break
             time.sleep(0.005)
         self.app.processEvents()
 

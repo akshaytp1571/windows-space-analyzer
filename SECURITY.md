@@ -87,12 +87,14 @@ states the known limits honestly.
 These are documented rather than reported as vulnerabilities. They are listed so
 you can judge whether a finding is new:
 
-* There is no re-check between `validate_target` and the `send2trash` call, so a
-  narrow TOCTOU window exists for a local attacker who can already write to the
-  same folders.
-* `oldwin.windows_old` is not a `DELETE_PATHS` action, so its paths never reach
-  `validate_target`. Its protection is the administrator gate plus Windows
-  performing the removal.
+* The re-check before the move narrows the TOCTOU window but does not close it: a
+  local attacker who can already write to the same folders still has the gap
+  between the second validation and the `send2trash` call. Closing it would need a
+  handle-based delete, which `send2trash` does not offer.
+* `oldwin.windows_old` is not a `DELETE_PATHS` action, so it does not use
+  `validate_target`; `Windows.old` is itself a top-level folder, which that
+  function refuses by design. It uses the stricter `safety.validate_windows_old`
+  instead, which accepts only this PC's exact `Windows.old` folder.
 * The "a misconfigured environment variable must never widen a deletion" rule is
   enforced for the two temp rules only; five other item families read their base
   folder from the environment and are bounded by `allowed_roots` instead.

@@ -9,7 +9,7 @@ import threading
 import unittest
 from unittest import mock
 
-from space_analyzer import cleaner, recycle, system
+from space_analyzer import cleaner, recycle, scanner, system
 from space_analyzer.models import ActionFailure, ActionKind, Category, CleanupItem, Risk
 
 _REG_HEADER = r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches"
@@ -84,7 +84,7 @@ class CleanerTestCase(unittest.TestCase):
         self.download = os.path.join(self.windows, "SoftwareDistribution", "Download")
         self.windows_old = os.path.join(self.disk, "Windows.old")
         self.outside = os.path.join(self.root, "outside")
-        for folder in (self.temp, self.download, self.outside):
+        for folder in (self.temp, self.download, self.outside, self.windows_old):
             os.makedirs(folder)
         self._patch(system, "fixed_drives", return_value=[self.disk + os.sep])
         self._patch(system, "system_drive", return_value=self.disk + os.sep)
@@ -176,6 +176,42 @@ class DeleteToRecycleTests(CleanerTestCase):
         self.assertEqual(recycler.calls, [])
         self.assertEqual(report.removed_count, 0)
         self.assertEqual(report.failed, [])
+
+    def test_a_path_that_becomes_a_link_after_sizing_is_not_sent(self) -> None:
+        """A file that turns into a link between sizing and the move must be refused.
+
+        This is the TOCTOU guard. The swap is timed to happen *after* the first
+        validate_target call (which runs before measuring) and before the re-check, so
+        only the re-check can catch it. If the re-check is removed, this test fails:
+        the link reaches the recycler.
+        """
+        first = self._file(self.temp, "a.tmp", size=100)
+        second = self._file(self.temp, "b.tmp", size=200)
+        recycler = FakeRecycler()
+        swapped = {"done": False}
+        real_measure = scanner.measure_path  # captured before the patch, or the call recurses
+
+        def measure_then_swap(path: str, *, cancel=None):
+            """Measure normally, then flip `second` to look like a link."""
+            result = real_measure(path, cancel=cancel)
+            if path == second:
+                swapped["done"] = True
+            return result
+
+        def is_link_now(path: str) -> bool:
+            """Only report a link once the swap has happened."""
+            return swapped["done"] and path == second
+
+        with mock.patch.object(scanner, "measure_path", side_effect=measure_then_swap), \
+                mock.patch.object(system, "is_link", side_effect=is_link_now):
+            report = cleaner.delete_to_recycle([first, second], [self.temp], recycler=recycler)
+
+        self.assertTrue(swapped["done"], "the swap must have happened during the run")
+        self.assertEqual(recycler.calls, [[first]])
+        self.assertEqual([failure.path for failure in report.failed], [second])
+        self.assertIn("Links and junctions are not followed", report.failed[0].reason)
+        self.assertEqual(report.removed_count, 1)
+        self.assertEqual(report.bytes_removed, 100)
 
 
 class PerformTests(CleanerTestCase):

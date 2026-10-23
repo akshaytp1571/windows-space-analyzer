@@ -45,6 +45,27 @@ def validate_target(
     return None
 
 
+def validate_windows_old(path: str) -> str | None:
+    """Return None when path is exactly this PC's Windows.old folder, otherwise a reason.
+
+    Windows.old is a top-level folder on the system drive, so `validate_target` refuses it
+    by design — that rule exists to stop a bad cleanup item naming an arbitrary top-level
+    folder. This action needs the opposite guarantee: that the path is the one, fixed,
+    named location the action is defined to target, and nothing else. It is a stricter
+    check than validate_target, not a bypass of it.
+    """
+    if not path or not path.strip():
+        return "No path given"
+    expected = os.path.join(system.system_drive(), "Windows.old")
+    if system.norm(path) != system.norm(expected):
+        return "Not the Windows.old folder on this PC"
+    if not os.path.isdir(path):
+        return "Windows.old is no longer a folder"
+    if system.is_link(path):
+        return "Links and junctions are not followed"
+    return None
+
+
 def _is_drive_root(target: str) -> bool:
     """True for a filesystem root or a fixed drive root. `target` must already be normalized."""
     if os.path.dirname(target) == target:
