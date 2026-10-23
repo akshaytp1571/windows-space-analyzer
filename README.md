@@ -115,10 +115,27 @@ The full model — including the honest list of known limitations — is in
 
 ### Run the executable
 
-Download the latest `WindowsSpaceAnalyzer.exe` from
-[Releases](https://github.com/akshaytp1571/windows-space-analyzer/releases) and run
-it. No Python needed. It runs as a normal user and offers **Restart as
+Download `WindowsSpaceAnalyzer.exe` from the
+[v1.0.0 release](https://github.com/akshaytp1571/windows-space-analyzer/releases/tag/v1.0.0)
+and run it. No Python needed. It runs as a normal user and offers **Restart as
 administrator** for the items that need it.
+
+The binary is unsigned, so Windows SmartScreen will show a warning the first time
+you run it. Click *More info* → *Run anyway*, or build it yourself from source
+with `build_exe.bat` if you would rather not trust a downloaded binary — that is a
+reasonable choice for a tool that deletes files.
+
+| | |
+|---|---|
+| File | `WindowsSpaceAnalyzer.exe` |
+| Size | 51,497,713 bytes (49.1 MB) |
+| SHA-256 | `ffe30f3381fdc9790cdf8f9609de974cbc1e941e3f72eebc6a65d9e503e8505f` |
+
+Verify it after downloading:
+
+```powershell
+Get-FileHash .\WindowsSpaceAnalyzer.exe -Algorithm SHA256
+```
 
 ### Run from source
 
