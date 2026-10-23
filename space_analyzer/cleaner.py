@@ -276,8 +276,13 @@ def _clean_windows_old(
         report.failed.append(ActionFailure(item.title, _first_line(out, err, code)))
         return
     if any(os.path.lexists(path) for path in item.paths):
+        # Windows holds handles on part of Windows.old until the next boot, so a
+        # restart is genuinely required before the rest can go. This is what sets
+        # ActionReport.requires_restart, which the report dialog shows.
+        report.requires_restart = True
         report.messages.append(
-            "Some files remain. Restart the PC and run this action again if they are still there."
+            "Some files remain because Windows still has them open. Restart the PC "
+            "and run this action again to remove the rest."
         )
 
 

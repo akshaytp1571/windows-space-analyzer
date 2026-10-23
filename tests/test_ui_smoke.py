@@ -45,8 +45,12 @@ class UiSmokeTest(unittest.TestCase):
         self.assertIsNotNone(self.app)
 
     def test_main_window_constructs(self) -> None:
+        from space_analyzer import __version__
+
         window = self._make_window()
-        self.assertEqual(window.windowTitle(), "Windows Space Analyzer")
+        # The title carries the version so a user can report which build they ran.
+        self.assertEqual(window.windowTitle(), f"Windows Space Analyzer {__version__}")
+        self.assertFalse(window.windowIcon().isNull(), "the window must carry an app icon")
 
     def test_navigation_lists_pages_in_order(self) -> None:
         from PySide6.QtWidgets import QListWidget
@@ -67,6 +71,96 @@ class UiSmokeTest(unittest.TestCase):
 
         self.assertTrue(callable(dialogs.confirm))
         self.assertTrue(callable(dialogs.show_reports))
+
+    def test_app_icon_has_every_size(self) -> None:
+        from space_analyzer.ui import icons
+
+        icon = icons.app_icon()
+        self.assertFalse(icon.isNull())
+        widths = sorted(size.width() for size in icon.availableSizes())
+        # Taskbar, Alt-Tab and Explorer all ask for different sizes.
+        self.assertIn(16, widths)
+        self.assertIn(32, widths)
+        self.assertIn(256, widths)
+
+    def test_logging_writes_to_a_file(self) -> None:
+        import logging
+        import os
+        import tempfile
+        from unittest import mock
+
+        from space_analyzer.ui import app as app_module
+
+        self._close_root_handlers_on_cleanup()
+        with tempfile.TemporaryDirectory() as folder:
+            target = os.path.join(folder, "nested", "space-analyzer.log")
+            try:
+                with mock.patch.object(app_module, "log_file_path", return_value=target):
+                    path = app_module.configure_logging()
+                self.assertEqual(path, target)
+                self.assertTrue(os.path.exists(path), "the log file must be created")
+                logging.getLogger("space_analyzer.test").warning("written by the test")
+                self._flush_root_handlers()
+                with open(path, encoding="utf-8") as handle:
+                    self.assertIn("written by the test", handle.read())
+            finally:
+                self._close_root_handlers()
+
+    def test_uncaught_exception_is_logged_not_swallowed(self) -> None:
+        import os
+        import sys
+        import tempfile
+        from unittest import mock
+
+        from space_analyzer.ui import app as app_module
+
+        original = sys.excepthook
+        self.addCleanup(setattr, sys, "excepthook", original)
+        self._close_root_handlers_on_cleanup()
+        with tempfile.TemporaryDirectory() as folder:
+            target = os.path.join(folder, "log.txt")
+            try:
+                with mock.patch.object(app_module, "log_file_path", return_value=target), \
+                        mock.patch.object(app_module, "QMessageBox") as box:
+                    app_module.configure_logging()
+                    app_module._install_excepthook()
+                    try:
+                        raise ValueError("boom for the test")
+                    except ValueError:
+                        sys.excepthook(*sys.exc_info())
+                    box.return_value.exec.assert_called_once()
+                self._flush_root_handlers()
+                with open(target, encoding="utf-8") as handle:
+                    text = handle.read()
+                self.assertIn("CRITICAL", text)
+                self.assertIn("boom for the test", text)
+            finally:
+                self._close_root_handlers()
+
+    def _flush_root_handlers(self) -> None:
+        """Push buffered records to disk so a test can read them back."""
+        import logging
+
+        for handler in logging.getLogger().handlers:
+            handler.flush()
+
+    def _close_root_handlers(self) -> None:
+        """Detach and close the root log handlers.
+
+        Windows will not delete a file that another handle still has open, so a
+        handler left on the root logger makes TemporaryDirectory cleanup fail with
+        PermissionError. Called from a finally block, before the folder goes away.
+        """
+        import logging
+
+        root = logging.getLogger()
+        for handler in list(root.handlers):
+            root.removeHandler(handler)
+            handler.close()
+
+    def _close_root_handlers_on_cleanup(self) -> None:
+        """Also close the root handlers at teardown, in case a test left one behind."""
+        self.addCleanup(self._close_root_handlers)
 
     def test_usage_color_thresholds(self) -> None:
         from space_analyzer.ui import theme

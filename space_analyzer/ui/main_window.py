@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from space_analyzer import system
+from space_analyzer import __version__, system
 from space_analyzer.ui import icons, theme
 from space_analyzer.ui.pages.duplicates import DuplicatesPage
 from space_analyzer.ui.pages.large_files import LargeFilesPage
@@ -43,7 +43,8 @@ class MainWindow(QMainWindow):
     def __init__(self, state: AppState, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._state = state
-        self.setWindowTitle("Windows Space Analyzer")
+        self.setWindowTitle(f"Windows Space Analyzer {__version__}")
+        self.setWindowIcon(icons.app_icon())
         self.setMinimumSize(1060, 700)
         self.resize(1400, 880)
 

@@ -5,9 +5,35 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.1] — 2026-10-23
+
+Production-readiness pass. The v1.0.0 executable was built before the safety
+fixes below landed, so **v1.0.0 shipped a binary that did not contain them**. Use
+1.0.1.
+
+### Added
+
+- **Crash logging.** The app now writes to
+  `%LOCALAPPDATA%\WindowsSpaceAnalyzer\space-analyzer.log` (rotating, 512 KB × 3).
+  A windowed build has no console, so before this an unexpected exception vanished
+  with no trace at all. Startup, elevation state and every error are recorded.
+- **An uncaught-exception handler.** An unexpected error is logged, and the user
+  gets a dialog naming the log file with the traceback available under *Details*,
+  instead of the window simply dying.
+- **An application icon**, painted at seven sizes (16–256 px), used for the window,
+  the taskbar and Alt-Tab. Previously the exe and window showed the generic
+  Python/Qt icon.
+- **The version is visible.** The window title is now
+  `Windows Space Analyzer <version>`, so a user can say which build they ran.
 
 ### Fixed
+
+- **`ActionReport.requires_restart` is now actually set.** It was declared and
+  rendered by the report dialog but no code path ever set it to `True`. Removing
+  `Windows.old` genuinely needs a restart when Windows still holds handles, so that
+  case now sets it and the report says so.
+
+### Fixed in 1.0.0 (documented here for completeness)
 
 - **`Windows.old` is now path-checked.** `CLEAN_WINDOWS_OLD` previously reached the
   registry and `cleanmgr` without validating its target. It cannot use
@@ -93,5 +119,6 @@ First public release.
 - Complete documentation: user guide, safety model, architecture contract and
   development guide
 
-[Unreleased]: https://github.com/akshaytp1571/windows-space-analyzer/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/akshaytp1571/windows-space-analyzer/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/akshaytp1571/windows-space-analyzer/releases/tag/v1.0.1
 [1.0.0]: https://github.com/akshaytp1571/windows-space-analyzer/releases/tag/v1.0.0

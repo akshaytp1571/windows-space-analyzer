@@ -265,3 +265,45 @@ def icon(name: str, color: str | None = None, size: int = 18) -> QIcon:
     for scale in (1, 2):
         result.addPixmap(_pixmap(name, size, tint, float(scale)))
     return result
+
+
+_APP_SIZES = (16, 24, 32, 48, 64, 128, 256)
+
+
+def app_icon() -> QIcon:
+    """Return the application icon: the drive glyph on the accent colour.
+
+    A windowed build has no console, so this is the only branding the user sees in
+    the taskbar and in Alt-Tab. It is painted rather than loaded so the build needs
+    no image assets.
+    """
+    result = QIcon()
+    for size in _APP_SIZES:
+        result.addPixmap(_app_pixmap(size))
+    return result
+
+
+@lru_cache(maxsize=len(_APP_SIZES))
+def _app_pixmap(size: int) -> QPixmap:
+    """One app-icon size: a dark rounded tile with the accent drive glyph centred."""
+    canvas = QPixmap(size, size)
+    canvas.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(canvas)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+    tile = QRectF(0.0, 0.0, float(size), float(size))
+    radius = max(2.0, size * 0.22)
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(QColor(theme.BG_DEEP))
+    painter.drawRoundedRect(tile, radius, radius)
+
+    # The drive glyph sits in the middle at 66% of the tile, leaving a clear margin.
+    steps = _ICONS.get("drive")
+    if steps:
+        inset = size * 0.17
+        painter.save()
+        painter.translate(inset, inset)
+        _draw(painter, steps, QColor(theme.SIGNAL), size - inset * 2)
+        painter.restore()
+    painter.end()
+    return canvas

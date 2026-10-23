@@ -271,3 +271,63 @@ Not currently. This is a known gap; see the open issues.
 | Open a file's folder | Double-click the row, or use **Open location** |
 | Expand a folder | Click the arrow, or double-click the row |
 | Close a dialog | `Esc` cancels |
+
+## If something goes wrong
+
+### The window shows an "unexpected error" dialog
+
+Something failed inside the app. **No files are changed by the step that failed** —
+the dialog appears instead of the app continuing in a bad state.
+
+Click *Show Details* and the traceback is there. A full report is written to:
+
+```
+%LOCALAPPDATA%\WindowsSpaceAnalyzer\space-analyzer.log
+```
+
+Paste that file into a [bug report](https://github.com/akshaytp1571/windows-space-analyzer/issues).
+It records the version, whether the app was elevated, and what it was doing.
+
+### The app closes immediately and nothing appears
+
+Check the log file above. If it does not exist, the failure happened before the app
+could start — usually a missing or broken install. Re-download the executable, or
+run from source to see the error on a console:
+
+```bat
+.venv\Scripts\python.exe main.py
+```
+
+### Windows says "Windows protected your PC"
+
+The executable is unsigned. Click *More info* → *Run anyway*. If you would rather
+not trust a downloaded binary, build it yourself with `build_exe.bat` and compare
+the SHA-256 against the one published in the [README](../README.md).
+
+### An item is greyed out and cannot be ticked
+
+It needs administrator rights. Use **Restart as administrator** in the bottom-right
+corner. Items that need elevation are never pre-ticked and are refused without it.
+
+### A cleanup freed less space than it said it would
+
+The files went to the Recycle Bin. Empty it — the Suggestions page offers to do
+this when a cleanup finishes. *Windows Update download cache* is in the same
+position: the space is only freed after the bin is emptied.
+
+### "Some files remain because Windows still has them open"
+
+This can happen with *Previous Windows installation*. Windows keeps handles on part
+of `Windows.old` until the next boot, so restart the PC and run the action again to
+remove the rest. The report dialog tells you when a restart is required.
+
+### A scan reports a large "Not read" figure
+
+Windows protects system folders from every program. The app reports what it could
+not read rather than pretending the drive is smaller. Running as administrator
+usually reduces the figure.
+
+### How do I know which version I am running?
+
+The window title shows it: `Windows Space Analyzer 1.0.1`. The log file records it
+too.

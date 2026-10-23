@@ -116,7 +116,7 @@ The full model — including the honest list of known limitations — is in
 ### Run the executable
 
 Download `WindowsSpaceAnalyzer.exe` from the
-[v1.0.0 release](https://github.com/akshaytp1571/windows-space-analyzer/releases/tag/v1.0.0)
+[v1.0.1 release](https://github.com/akshaytp1571/windows-space-analyzer/releases/tag/v1.0.1)
 and run it. No Python needed. It runs as a normal user and offers **Restart as
 administrator** for the items that need it.
 
@@ -128,8 +128,9 @@ reasonable choice for a tool that deletes files.
 | | |
 |---|---|
 | File | `WindowsSpaceAnalyzer.exe` |
-| Size | 51,497,713 bytes (49.1 MB) |
-| SHA-256 | `ffe30f3381fdc9790cdf8f9609de974cbc1e941e3f72eebc6a65d9e503e8505f` |
+| Version | 1.0.1 |
+| Size | 51,525,221 bytes (49.1 MB) |
+| SHA-256 | `add8e971198498f6497fcd2626e98d18fc205ea814545666f2b498b1d16bd475` |
 
 Verify it after downloading:
 
