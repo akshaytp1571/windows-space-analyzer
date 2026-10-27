@@ -10,6 +10,9 @@ from space_analyzer import apps, system
 
 GUID = "{12345678-1234-1234-1234-123456789012}"
 
+# A stand-in for the real System32 path, so the launch tests run on any platform.
+_FAKE_MSIEXEC = r"C:\Windows\System32\msiexec.exe"
+
 
 class ParseSizeTests(unittest.TestCase):
     """EstimatedSize is recorded in kilobytes; everything is returned as bytes."""
@@ -99,12 +102,14 @@ class MsiProductCodeTests(unittest.TestCase):
 
     def test_extra_switches_are_not_carried_through(self) -> None:
         command = f'Msiexec.exe /x {GUID} /qn /norestart /L*v "C:\\temp\\x.log"'
-        self.assertEqual(apps._split_command(command), [apps._msiexec_path(), "/x", GUID])
+        with mock.patch.object(apps, "_msiexec_path", return_value=_FAKE_MSIEXEC):
+            self.assertEqual(apps._split_command(command), [_FAKE_MSIEXEC, "/x", GUID])
 
     def test_a_command_without_a_code_gives_none(self) -> None:
         self.assertIsNone(apps.msi_product_code("msiexec /x"))
         self.assertIsNone(apps._split_command("msiexec /x"))
 
+    @unittest.skipUnless(system.IS_WINDOWS, "needs a real System32")
     def test_msiexec_is_resolved_to_an_absolute_path(self) -> None:
         # A bare name would be looked up on PATH. The app starts programs only from
         # a path it can point at, the same rule applied to vendor uninstallers.
@@ -112,6 +117,25 @@ class MsiProductCodeTests(unittest.TestCase):
         self.assertIsNotNone(resolved)
         self.assertTrue(os.path.isabs(resolved))
         self.assertTrue(resolved.lower().endswith("msiexec.exe"))
+
+    def test_msiexec_path_is_built_from_the_windows_folder(self) -> None:
+        # Portable check of the resolution rule, with the folder supplied.
+        with mock.patch.object(system, "windows_dir", return_value=r"C:\Windows"):
+            with mock.patch.object(apps.os.path, "isfile", return_value=True):
+                self.assertEqual(
+                    apps._msiexec_path(), os.path.join(r"C:\Windows", "System32", "msiexec.exe")
+                )
+
+    def test_no_windows_folder_means_no_msiexec(self) -> None:
+        # Off Windows there is no System32, so the launch is refused rather than
+        # falling back to a PATH lookup.
+        with mock.patch.object(system, "windows_dir", return_value=""):
+            self.assertIsNone(apps._msiexec_path())
+
+    def test_a_missing_msiexec_file_means_no_msiexec(self) -> None:
+        with mock.patch.object(system, "windows_dir", return_value=r"C:\Windows"):
+            with mock.patch.object(apps.os.path, "isfile", return_value=False):
+                self.assertIsNone(apps._msiexec_path())
 
     def test_a_missing_msiexec_refuses_the_launch(self) -> None:
         with mock.patch.object(apps, "_msiexec_path", return_value=None):
@@ -166,10 +190,11 @@ class LaunchUninstallTests(unittest.TestCase):
 
     def test_an_msi_uninstall_runs_msiexec_with_the_product_code(self) -> None:
         with mock.patch.object(system, "IS_WINDOWS", True), \
+                mock.patch.object(apps, "_msiexec_path", return_value=_FAKE_MSIEXEC), \
                 mock.patch.object(system, "spawn", return_value=None) as spawn:
             result = apps.launch_uninstall(self._app(f"MsiExec.exe /I{GUID}"))
         self.assertIsNone(result)
-        spawn.assert_called_once_with([apps._msiexec_path(), "/x", GUID])
+        spawn.assert_called_once_with([_FAKE_MSIEXEC, "/x", GUID])
 
     def test_a_vendor_uninstaller_runs_its_own_path(self) -> None:
         command = r'"C:\Program Files\App\uninst.exe" /S'
