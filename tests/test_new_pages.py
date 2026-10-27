@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 import os
 import unittest
 from unittest import mock
@@ -12,10 +13,16 @@ _QT = None
 
 
 def _pyside() -> bool:
+    """True when the Qt widgets module can actually be imported.
+
+    Importing PySide6 alone is not enough: on a headless Linux runner the package
+    is present but QtWidgets raises OSError for a missing libEGL. Importing the
+    module we need means the skip is decided by the same thing the tests need.
+    """
     try:
-        import PySide6  # noqa: F401
+        importlib.import_module("PySide6.QtWidgets")
         return True
-    except Exception:
+    except (ImportError, OSError):
         return False
 
 

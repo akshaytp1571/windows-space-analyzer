@@ -105,13 +105,16 @@ def uninstall_problem(command: str) -> Optional[str]:
     if not match:
         return "The registered command does not start with a program"
     program = match.group(1)
-    if not _is_absolute(program):
-        return "The registered command is a relative path"
 
     # A UNC path points at another machine. The app cannot vouch for a program it
     # would fetch over the network, and an offline share would hang the launch.
+    # Checked before the absolute-path test because a UNC path is not "absolute" on
+    # every platform, and "on a network share" is the accurate reason to give.
     if program.startswith("\\\\") or program.startswith("//"):
         return "The registered command is on a network share"
+
+    if not _is_absolute(program):
+        return "The registered command is a relative path"
     return None
 
 

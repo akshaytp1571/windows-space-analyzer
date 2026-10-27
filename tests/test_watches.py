@@ -135,10 +135,21 @@ class StorageTests(unittest.TestCase):
 
     def test_the_same_folder_cannot_be_added_twice(self) -> None:
         watches.add(watches.Watch(path=self.folder_a), self.path)
+        # A trailing separator is the same folder, and this spelling works on every
+        # platform. Comparing an upper-cased path would only hold on Windows.
         self.assertEqual(
-            watches.add(watches.Watch(path=self.folder_a.upper()), self.path),
+            watches.add(watches.Watch(path=self.folder_a + os.sep), self.path),
             "That folder is already watched",
         )
+
+    def test_case_is_ignored_when_comparing_folders(self) -> None:
+        # Windows paths are case-insensitive, so two spellings are one folder. The
+        # comparison is done on the text, not on the filesystem.
+        self.assertTrue(watches._same_folder("C:\\Users\\Me", "c:\\users\\me"))
+        self.assertTrue(watches._same_folder("C:\\Users\\Me\\", "C:\\Users\\Me"))
+
+    def test_different_folders_are_not_confused(self) -> None:
+        self.assertFalse(watches._same_folder("C:\\Users\\Me", "C:\\Users\\You"))
 
     def test_remove_drops_the_watch(self) -> None:
         watches.add(watches.Watch(path=self.folder_a), self.path)
