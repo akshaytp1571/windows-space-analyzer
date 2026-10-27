@@ -45,6 +45,12 @@ from the app uninstaller, which only runs an uninstaller the publisher registere
 ### Security
 
 - Exports are written only where you choose, when you ask. Nothing is uploaded.
+- MsiExec is launched as its absolute `System32` path rather than by bare name. A
+  bare name is a `PATH` lookup, and the same absolute-path rule already applied to
+  vendor uninstallers; this closes the gap for MSI products. If `msiexec.exe`
+  cannot be found the launch is refused rather than falling back to a lookup.
+- The uninstaller launch rules are now documented in `SECURITY.md` (commitment 9)
+  and `docs/SAFETY.md`, including the table of refused commands.
 - Uninstall commands are validated before launch: only an absolute, local `.exe`
   path or an MsiExec product code is accepted. Anything else is refused with a
   reason shown in the status line.

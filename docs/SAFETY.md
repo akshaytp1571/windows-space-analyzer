@@ -49,10 +49,55 @@ This is the part most such documents gloss over. Be clear about it:
 | Turn hibernation off | No — takes no path |
 | Delete restore points | No — takes no path |
 | Remove `Windows.old` | No — uses the stricter `validate_windows_old` instead |
+| Uninstalling an app | No — launches a program, and is checked by `apps.uninstall_problem` instead |
 
 The three operations that take no path have nothing for a path validator to check;
 they are protected differently, described in the next section. `Windows.old` does
-have a path, so it gets its own check rather than none.
+have a path, so it gets its own check rather than none. Uninstalling launches a
+program rather than removing a path, so it is checked against the launch rules in
+the section after that.
+
+## Launching a publisher's uninstaller
+
+The Apps page is the only place the app starts a program it did not write, so it is
+guarded by its own check rather than by the path gate. `validate_target` asks "may
+this path be deleted?"; an uninstaller is not being deleted, so that is the wrong
+question.
+
+`apps.uninstall_problem` answers the right one. A registered command is launched
+only when it is one of two things:
+
+1. **An absolute local `.exe` path**, which may be quoted or unquoted, with or
+   without arguments — `"C:\Program Files\App\uninst.exe" /S` and
+   `C:\Program Files\App\uninst.exe /S` are both accepted.
+2. **An MsiExec product code**, in any spelling installers actually use: `/X`,
+   `/I` or `/uninstall`. Windows' own Apps page treats all three as "uninstall this
+   product", so refusing `/I` would have blocked Java, Node.js and Chrome Remote
+   Desktop for no reason.
+
+Everything else is refused, and the reason is shown in the status line:
+
+| Refused | Why |
+|---|---|
+| `cmd`, `powershell`, `pwsh`, `cscript`, `wscript`, `mshta`, `rundll32`, `regsvr32` | A shell re-parses the rest of the line |
+| `del`, `erase`, `rd`, `rmdir`, `format`, `shutdown` | A deletion tool, not an uninstaller |
+| A bare name such as `uninst.exe` | `PATH` decides what runs, not the publisher |
+| A network share such as `\\server\share\x.exe` | The app cannot vouch for a program it fetches over the network |
+| An MsiExec command with no product code | Nothing to uninstall |
+
+Two details that matter more than they look:
+
+- **Only the product code survives.** The app does not run the registered MsiExec
+  line. It extracts the code and runs `/x {code}`, so no extra switches a registry
+  value carried — `/qn`, `/norestart`, a log path — reach the call.
+- **MsiExec is resolved to an absolute path.** It is launched as
+  `C:\Windows\System32\msiexec.exe`, not by bare name, for the same reason a
+  vendor path must be absolute: a bare name is a `PATH` lookup. If `System32\msiexec.exe`
+  cannot be found, the launch is refused rather than falling back to a lookup.
+
+The app never deletes an application's files itself. The uninstaller does that,
+shows its own prompts, and reports its own errors. The confirmation dialog shows
+the exact registered command before anything starts.
 
 ## How the permanent actions are protected
 

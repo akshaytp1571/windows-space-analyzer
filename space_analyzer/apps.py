@@ -378,16 +378,37 @@ def launch_uninstall(app: InstalledApp) -> Optional[str]:
 
 
 def _split_command(command: str) -> Optional[list[str]]:
-    """Split an MsiExec command into `["msiexec", "/x", guid]`.
+    """Split an MsiExec command into `[<system msiexec>, "/x", guid]`.
 
     The product code is the only argument kept, and `/x` is always the flag used,
     even when the publisher registered `/I`. Anything else they appended is
     dropped, so a registry value cannot smuggle extra switches into the call.
+
+    MsiExec is resolved to its absolute System32 path rather than named bare. A
+    bare name is looked up on PATH, and the same rule already applies to vendor
+    executables: a program is only started from a path the app can point at. If
+    System32 cannot be found this returns None and the caller refuses.
     """
     guid = msi_product_code(command)
     if guid is None:
         return None
-    return ["msiexec", "/x", guid]
+    msiexec = _msiexec_path()
+    if msiexec is None:
+        return None
+    return [msiexec, "/x", guid]
+
+
+def _msiexec_path() -> Optional[str]:
+    """The absolute path to msiexec.exe, or None when it cannot be found.
+
+    Only a file that actually exists is returned, so a refusal is honest: the app
+    will not hand a path to CreateProcess that it has not confirmed.
+    """
+    windows = system.windows_dir()
+    if not windows:
+        return None
+    candidate = os.path.join(windows, "System32", "msiexec.exe")
+    return candidate if os.path.isfile(candidate) else None
 
 
 def _split_program(command: str) -> tuple[Optional[str], list[str]]:

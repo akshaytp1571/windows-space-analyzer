@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import unittest
 from unittest import mock
 
@@ -98,11 +99,36 @@ class MsiProductCodeTests(unittest.TestCase):
 
     def test_extra_switches_are_not_carried_through(self) -> None:
         command = f'Msiexec.exe /x {GUID} /qn /norestart /L*v "C:\\temp\\x.log"'
-        self.assertEqual(apps._split_command(command), ["msiexec", "/x", GUID])
+        self.assertEqual(apps._split_command(command), [apps._msiexec_path(), "/x", GUID])
 
     def test_a_command_without_a_code_gives_none(self) -> None:
         self.assertIsNone(apps.msi_product_code("msiexec /x"))
         self.assertIsNone(apps._split_command("msiexec /x"))
+
+    def test_msiexec_is_resolved_to_an_absolute_path(self) -> None:
+        # A bare name would be looked up on PATH. The app starts programs only from
+        # a path it can point at, the same rule applied to vendor uninstallers.
+        resolved = apps._msiexec_path()
+        self.assertIsNotNone(resolved)
+        self.assertTrue(os.path.isabs(resolved))
+        self.assertTrue(resolved.lower().endswith("msiexec.exe"))
+
+    def test_a_missing_msiexec_refuses_the_launch(self) -> None:
+        with mock.patch.object(apps, "_msiexec_path", return_value=None):
+            self.assertIsNone(apps._split_command(f"MsiExec.exe /X{GUID}"))
+
+    def test_a_launch_without_msiexec_reports_a_reason(self) -> None:
+        app = apps.InstalledApp(
+            name="Test", version="1", publisher="P", install_location="",
+            uninstall_string=f"MsiExec.exe /X{GUID}", size_bytes=0,
+            scope="machine", key="k",
+        )
+        with mock.patch.object(system, "IS_WINDOWS", True), \
+                mock.patch.object(apps, "_msiexec_path", return_value=None), \
+                mock.patch.object(system, "spawn") as spawn:
+            reason = apps.launch_uninstall(app)
+        self.assertIn("could not be read", reason)
+        spawn.assert_not_called()
 
 
 class SplitProgramTests(unittest.TestCase):
@@ -143,7 +169,7 @@ class LaunchUninstallTests(unittest.TestCase):
                 mock.patch.object(system, "spawn", return_value=None) as spawn:
             result = apps.launch_uninstall(self._app(f"MsiExec.exe /I{GUID}"))
         self.assertIsNone(result)
-        spawn.assert_called_once_with(["msiexec", "/x", GUID])
+        spawn.assert_called_once_with([apps._msiexec_path(), "/x", GUID])
 
     def test_a_vendor_uninstaller_runs_its_own_path(self) -> None:
         command = r'"C:\Program Files\App\uninst.exe" /S'

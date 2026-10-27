@@ -81,6 +81,14 @@ states the known limits honestly.
 7. Items that need administrator rights are never pre-ticked and are refused
    when the app is not elevated.
 8. The app never requests elevation on its own.
+9. The app never deletes an application's own files. Uninstalling from the Apps
+   page runs the uninstaller the publisher registered, and nothing else. A
+   registered command is launched only when it is an absolute local `.exe` path
+   that exists, or an MsiExec product code — and MsiExec itself is resolved to its
+   absolute `System32` path rather than looked up on `PATH`. Shells, file-deletion
+   tools, relative names and network shares are refused, and the status line shows
+   the reason. This is stated plain rather than buried because it is the one place
+   the app starts a program it did not write.
 
 ## Known limitations
 
