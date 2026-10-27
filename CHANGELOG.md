@@ -5,6 +5,16 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] — 2026-10-27
+
+### Fixed
+
+- The window no longer opens taller than the desktop. The default size was a fixed
+  1400x880, but a 1536x864 laptop has only 816 usable pixels once the taskbar is
+  counted, so the bottom of the window — including the action row and the status
+  bar — fell off the screen. The size is now trimmed to the available area, with
+  a floor at the 1060x700 minimum so the layout never becomes unusable.
+
 ## [1.1.0] — 2026-10-27
 
 Two new pages, a richer file inventory, and export. Nothing already working was
@@ -171,7 +181,8 @@ First public release.
 - Complete documentation: user guide, safety model, architecture contract and
   development guide
 
-[Unreleased]: https://github.com/akshaytp1571/windows-space-analyzer/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/akshaytp1571/windows-space-analyzer/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/akshaytp1571/windows-space-analyzer/releases/tag/v1.1.1
 [1.1.0]: https://github.com/akshaytp1571/windows-space-analyzer/releases/tag/v1.1.0
 [1.0.1]: https://github.com/akshaytp1571/windows-space-analyzer/releases/tag/v1.0.1
 [1.0.0]: https://github.com/akshaytp1571/windows-space-analyzer/releases/tag/v1.0.0

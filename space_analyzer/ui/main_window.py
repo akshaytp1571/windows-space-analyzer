@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QCloseEvent
+from PySide6.QtGui import QCloseEvent, QGuiApplication
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -41,6 +41,38 @@ _PAGES = (
 )
 
 
+
+_BASE_SIZE = (1400, 880)
+_MINIMUM_SIZE = (1060, 700)
+_SCREEN_MARGIN = 40
+
+
+def _preferred_size() -> tuple[int, int]:
+    """The size to open at, kept inside the screen the window will appear on."""
+    screen = QGuiApplication.primaryScreen()
+    if screen is None:
+        return _BASE_SIZE
+    available = screen.availableGeometry()
+    return _approximate_size(available=(available.width(), available.height()))
+
+
+def _approximate_size(*, available: tuple[int, int]) -> tuple[int, int]:
+    """Fit the base size inside `available`, never going below the minimum.
+
+    The default is 1400x880, which is taller than a 1536x864 laptop's usable area
+    once the taskbar is taken. A window that opens taller than the desktop puts its
+    own action row and status bar below the bottom edge, where they cannot be
+    reached, so the size is trimmed with a small margin for the frame. The minimum
+    is a floor: below it the layout would stop being usable, so the window keeps
+    that size even if the screen is smaller.
+    """
+    base_width, base_height = _BASE_SIZE
+    minimum_width, minimum_height = _MINIMUM_SIZE
+    width = max(minimum_width, min(base_width, available[0] - _SCREEN_MARGIN))
+    height = max(minimum_height, min(base_height, available[1] - _SCREEN_MARGIN))
+    return width, height
+
+
 class MainWindow(QMainWindow):
     """Window with a navigation rail on the left, the pages on the right and a status bar."""
 
@@ -50,7 +82,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"Windows Space Analyzer {__version__}")
         self.setWindowIcon(icons.app_icon())
         self.setMinimumSize(1060, 700)
-        self.resize(1400, 880)
+        self.resize(*_preferred_size())
 
         self._pages: list[QWidget] = [
             OverviewPage(state),

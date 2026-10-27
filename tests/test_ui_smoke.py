@@ -72,6 +72,43 @@ class UiSmokeTest(unittest.TestCase):
         # A rail entry with no page behind it would show a blank panel.
         self.assertEqual(navigation.count(), window._stack.count())
 
+    def test_the_window_is_trimmed_to_the_screen(self) -> None:
+        # A window taller than the desktop puts its own action row and status bar
+        # below the bottom edge, where they cannot be reached.
+        #
+        # The offscreen platform reports an 800x800 virtual screen, smaller than the
+        # 1060x700 minimum, so the clamp floors at the minimum there. The rule is
+        # therefore checked directly by supplying a screen size.
+        from space_analyzer.ui import main_window
+
+        self.assertEqual(
+            main_window._approximate_size(available=(1536, 816)),
+            (1400, 776),
+        )
+        self.assertEqual(
+            main_window._approximate_size(available=(3840, 2160)),
+            (1400, 880),
+        )
+        self.assertEqual(
+            main_window._approximate_size(available=(800, 600)),
+            (1060, 700),
+        )
+
+    def test_the_preferred_size_never_goes_below_the_minimum(self) -> None:
+        from space_analyzer.ui.main_window import _preferred_size
+
+        width, height = _preferred_size()
+        self.assertGreaterEqual(width, 1060)
+        self.assertGreaterEqual(height, 700)
+
+    def test_the_window_actually_takes_the_preferred_size(self) -> None:
+        from space_analyzer.ui.main_window import _preferred_size
+
+        window = self._make_window()
+        expected_width, expected_height = _preferred_size()
+        self.assertEqual(window.width(), expected_width)
+        self.assertEqual(window.height(), expected_height)
+
     def test_closing_window_does_not_raise(self) -> None:
         window = self._make_window()
         window.show()
