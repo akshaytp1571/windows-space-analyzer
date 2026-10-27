@@ -21,7 +21,7 @@ as an administrator. Administrator rights unlock a few extra cleanup items; the
 app never asks for them on its own. If you want them, use **Restart as
 administrator** in the bottom-right corner.
 
-## The four pages
+## The six pages
 
 ### Overview — what is using the space
 
@@ -105,6 +105,88 @@ Use **Keep oldest** to tick everything except the oldest copy in each group, and
 
 A whole-drive duplicate search reads every candidate file, so it can take several
 minutes on a large drive.
+
+### Apps — installed software
+
+Lists what is installed, with the size each publisher recorded in the registry.
+Both the 32-bit and 64-bit views are read, so a 32-bit app does not go missing on a
+64-bit machine.
+
+**The sizes are a lower bound.** Publishers fill in the size themselves, and many
+leave it blank. The page says how many apps report no size, and those rows read
+"no size" rather than zero, so the total is never quietly wrong.
+
+**Uninstall runs the app's own uninstaller.** This tool does not delete an
+application's files. It reads the uninstall command the publisher registered,
+shows you that exact command in the confirmation, and then launches it. The
+uninstaller opens, shows its own prompts, and reports its own errors.
+
+A command is refused if it is not a real program path. These are blocked, with the
+reason shown in the status line:
+
+- shells and file-deletion tools — `cmd`, `powershell`, `pwsh`, `cscript`,
+  `wscript`, `mshta`, `del`, `erase`, `rd`, `format`, and similar
+- a relative name such as `uninst.exe`, which Windows would look up on `PATH`
+- a network share such as `\\server\share\x.exe`, which the app cannot vouch for
+- an MsiExec command with no product code in it
+
+MsiExec entries are accepted in every spelling installers actually use — `/X`, `/I`
+and `/uninstall` — because Windows' own settings page treats them all as "uninstall
+this product". The app always calls `msiexec /x {product code}` and drops any other
+switches, so nothing in the registry can add arguments to the call.
+
+**Export list** writes the current list to CSV or JSON.
+
+### Watch — folders, budgets and what changed
+
+Two panels on one page, answering one question: *is this folder getting bigger
+than I want?*
+
+**Watched folders.** Type or paste a folder path, optionally give it a size
+budget, and click **Add folder**. Click **Check now** to measure every watch. A
+folder is marked **OVER BUDGET** when its measured size is above the budget,
+**nearly full** at 90% or more, **within budget** below that, and **no budget**
+when none was set. A budget must be at least 1 MB, because anything smaller would
+fire on ordinary churn.
+
+Nothing is measured in the background, and adding a watch measures nothing until
+you ask. **Remove** stops watching a folder; the folder and its files are not
+touched. Protected system folders, links and junctions cannot be watched.
+
+**What changed.** Every finished scan is recorded, so this panel can compare the
+last two scans of the chosen drive and list which folders grew, shrank, appeared or
+vanished, biggest change first. If a drive has only been scanned once, the panel
+says so rather than showing an empty table.
+
+The history file stores aggregate figures and the top-level folders only — not a
+copy of your file names — and is capped at the 60 most recent scans. A cancelled
+scan is not recorded, because a partial result would look like folders shrank. The
+file is written atomically, so a crash during a save cannot corrupt it; a corrupt
+file is treated as empty rather than stopping the app.
+
+### Exporting a report
+
+Five things can be exported, each as CSV or JSON:
+
+| What | Where | Format follows |
+|---|---|---|
+| The file list, as filtered | Large files → **Export list** | the extension you choose |
+| The app list | Apps → **Export list** | the extension you choose |
+| Duplicate groups | Duplicates | the extension you choose |
+| Cleanup suggestions | Suggestions | the extension you choose |
+| Cleanup results | the report dialog after an action | the extension you choose |
+
+CSV files open directly in a spreadsheet. Two details matter:
+
+- A value beginning with `=`, `+`, `-` or `@` is prefixed with an apostrophe. A file
+  named `=cmd|calc` is legal on Windows, and without this guard a spreadsheet would
+  run it as a formula when you opened the report. The exported cell still shows
+  the real name; it just is not treated as a formula.
+- CSV files carry a UTF-8 BOM, because Excel otherwise renders non-ASCII paths as
+  mojibake.
+
+JSON files are UTF-8 with no BOM and include a `generated` timestamp. Exports are
+written only where you choose, when you ask. Nothing is uploaded.
 
 ## The complete cleanup item reference
 

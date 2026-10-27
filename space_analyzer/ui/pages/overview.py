@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 from collections.abc import Callable
 
@@ -22,7 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from space_analyzer import scanner, system, util
+from space_analyzer import history, scanner, system, util
 from space_analyzer.models import DriveInfo, ScanNode, ScanProgress, ScanResult
 from space_analyzer.ui import icons, theme
 from space_analyzer.ui.state import AppState
@@ -40,6 +41,8 @@ from space_analyzer.ui.widgets import (
     split_bytes,
 )
 from space_analyzer.ui.workers import Worker
+
+_LOG = logging.getLogger(__name__)
 
 _STOP_WAIT_MS = 5000
 _PATH_LIMIT = 74
@@ -111,6 +114,19 @@ def _placeholder() -> QTreeWidgetItem:
     item = QTreeWidgetItem(["…"])
     item.setFlags(Qt.ItemFlag.ItemIsEnabled)
     return item
+
+
+def _record_history(result: ScanResult) -> None:
+    """Append a summary of a finished scan to the stored history."""
+    try:
+        info = system.drive_info(result.root)
+        history.append(
+            history.make_snapshot(
+                result, free_bytes=info.free, capacity_bytes=info.total
+            )
+        )
+    except Exception:  # a history write must never break a finished scan
+        _LOG.exception("Could not record the scan history for %s", result.root)
 
 
 class OverviewPage(QWidget):
@@ -337,9 +353,16 @@ class OverviewPage(QWidget):
         self._status.setText(_progress_text(message))
 
     def _on_scan_succeeded(self, results: list[ScanResult]) -> None:
-        """Store each drive's result. Setting it also refreshes this page through scans_changed."""
+        """Store each drive's result, and record it in the history.
+
+        The history entry is what lets the Watch page show what changed between two
+        scans, so it is written only for a finished, uncancelled scan: a partial scan
+        would look like folders shrank.
+        """
         for result in results:
             self._state.set_scan(result)
+            if not result.cancelled:
+                _record_history(result)
         if self._cancel_requested or any(result.cancelled for result in results):
             self._status.setText("CANCELLED — the figures shown are partial")
             return

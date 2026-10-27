@@ -7,6 +7,7 @@ import html
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
+    QFileDialog,
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -24,6 +25,26 @@ from space_analyzer.ui.widgets import Panel, icon_label, rule, set_role
 _FAILURE_LIMIT = 20
 _RECYCLE_ACTIONS = ("recycle", ActionKind.DELETE_PATHS.value, ActionKind.CLEAN_UPDATE_CACHE.value)
 _UNTITLED_NAMES = {"recycle": "Moved to the Recycle Bin"}
+
+
+def ask_save_path(
+    parent: QWidget | None,
+    title: str,
+    suggested_name: str,
+    filter_label: str = "CSV or JSON",
+) -> str:
+    """Ask where to save an export. Returns "" when the user cancels.
+
+    Both CSV and JSON are offered. The chosen extension decides the format, which
+    export.write_* read back, so the two always agree.
+    """
+    path, _chosen = QFileDialog.getSaveFileName(
+        parent,
+        title,
+        suggested_name,
+        f"{filter_label} (*.csv *.json);;CSV (*.csv);;JSON (*.json)",
+    )
+    return path or ""
 
 
 def confirm(

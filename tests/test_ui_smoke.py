@@ -59,7 +59,18 @@ class UiSmokeTest(unittest.TestCase):
         navigation = window.findChild(QListWidget, "navigation")
         self.assertIsNotNone(navigation)
         titles = [navigation.item(row).text() for row in range(navigation.count())]
-        self.assertEqual(titles, ["Overview", "Suggestions", "Large files", "Duplicates"])
+        self.assertEqual(
+            titles,
+            ["Overview", "Suggestions", "Large files", "Duplicates", "Apps", "Watch"],
+        )
+
+    def test_every_rail_entry_opens_a_page(self) -> None:
+        from PySide6.QtWidgets import QListWidget
+
+        window = self._make_window()
+        navigation = window.findChild(QListWidget, "navigation")
+        # A rail entry with no page behind it would show a blank panel.
+        self.assertEqual(navigation.count(), window._stack.count())
 
     def test_closing_window_does_not_raise(self) -> None:
         window = self._make_window()

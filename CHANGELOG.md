@@ -5,6 +5,52 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-10-27
+
+Two new pages, a richer file inventory, and export. Nothing already working was
+changed; the safety rules are the same, and the new features are read-only apart
+from the app uninstaller, which only runs an uninstaller the publisher registered.
+
+### Added
+
+- **Apps page.** Lists installed software with the size each publisher recorded,
+  read from both the 32-bit and 64-bit uninstall keys. Uninstall runs the app's own
+  registered uninstaller after showing you the exact command, and refuses anything
+  that is not a real program path: shells, `del`, `format`, relative names and
+  network shares are all blocked. This tool never deletes an application's files.
+- **Watch page.** Folders you choose, each with an optional size budget. The page
+  reports which folders are over budget and by how much. Nothing is measured in the
+  background, and a watch never deletes or moves anything.
+- **Scan history and a change view.** Every finished scan is recorded (aggregate
+  figures only, largest folders first, capped at 60 entries) so the Watch page can
+  show which folders grew, shrank, appeared or vanished since the previous scan.
+- **Export.** The file list, the app list, the duplicate groups, the cleanup
+  suggestions and the cleanup reports can be written as CSV or JSON. CSV output is
+  guarded against spreadsheet formula injection and gets a UTF-8 BOM so Excel reads
+  non-ASCII paths correctly.
+- **File-type breakdown** on the Large files page: a stacked bar and legend showing
+  what kinds of file make up the listed size.
+
+### Changed
+
+- The Large files page gained the breakdown panel and an Export button; the table,
+  the filters and the Recycle Bin action are unchanged.
+- The navigation rail now lists six pages.
+
+### Fixed
+
+- The file-type grouping keeps an unrecognised extension under its own name rather
+  than hiding it in "other", so an unexpected kind of file is still visible.
+
+### Security
+
+- Exports are written only where you choose, when you ask. Nothing is uploaded.
+- Uninstall commands are validated before launch: only an absolute, local `.exe`
+  path or an MsiExec product code is accepted. Anything else is refused with a
+  reason shown in the status line.
+- The scan history stores aggregate figures, not file names, so the history file
+  does not put a copy of your directory listing on disk.
+
 ## [1.0.1] — 2026-10-23
 
 Production-readiness pass. The v1.0.0 executable was built before the safety
@@ -119,6 +165,7 @@ First public release.
 - Complete documentation: user guide, safety model, architecture contract and
   development guide
 
-[Unreleased]: https://github.com/akshaytp1571/windows-space-analyzer/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/akshaytp1571/windows-space-analyzer/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/akshaytp1571/windows-space-analyzer/releases/tag/v1.1.0
 [1.0.1]: https://github.com/akshaytp1571/windows-space-analyzer/releases/tag/v1.0.1
 [1.0.0]: https://github.com/akshaytp1571/windows-space-analyzer/releases/tag/v1.0.0

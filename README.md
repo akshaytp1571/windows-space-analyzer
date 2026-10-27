@@ -11,7 +11,7 @@ went, then helps you get it back — with a safety gate in front of every deleti
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB.svg)](https://www.python.org/downloads/)
 [![PySide6](https://img.shields.io/badge/PySide6-6.x-41CD52.svg)](https://pypi.org/project/PySide6/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D4.svg)](#requirements)
-[![Tests](https://img.shields.io/badge/Tests-254%20passing-c8f751.svg)](#running-the-tests)
+[![Tests](https://img.shields.io/badge/Tests-433%20passing-c8f751.svg)](#running-the-tests)
 
 [Quick start](#quick-start) ·
 [What it does](#what-it-does) ·
@@ -43,6 +43,8 @@ not explicitly ask it to delete.
 | `02` | **Suggestions** | Sixteen cleanup candidates across seven categories, each with its size, risk level, what you lose, and whether it comes back. |
 | `03` | **Large files** | The biggest files on a drive, filterable by size and name, sortable by any column. |
 | `04` | **Duplicates** | Files with identical content, grouped, with one copy marked to keep. |
+| `05` | **Apps** | Installed software, the size each publisher recorded, and its own uninstaller. |
+| `06` | **Watch** | Folders you choose, an optional size budget, and what changed since the last scan. |
 
 <details>
 <summary><b>More screenshots</b></summary>
@@ -61,7 +63,52 @@ never lose every copy:
 
 ![Duplicates page](assets/duplicates.png)
 
+**Apps** — installed software with the size each publisher recorded, and a safe
+uninstall that runs the app's own uninstaller:
+
+![Apps page](assets/apps.png)
+
+**Watch** — folders with size budgets, and a change view showing what grew or
+shrank between the last two scans of a drive:
+
+![Watch page](assets/watch.png)
+
 </details>
+
+### Beyond the original four pages
+
+Three of these are new in 1.1.0, and one is an addition to an existing page.
+
+**A file-type breakdown on Large files.** A stacked bar and a legend split the
+listed files by kind — video, archive, installer and so on — so you can see
+what is actually filling the drive rather than only which single file is biggest.
+It is built from the largest-files list the scan already collected, so opening the
+page costs nothing and never touches the disk.
+
+**Apps.** Lists installed software from both the 32-bit and 64-bit uninstall keys,
+with the size the publisher recorded. Many publishers record nothing, so the page
+says how many are missing a size and calls the total a lower bound. Uninstall runs
+the uninstaller the publisher registered, after showing you the exact command. The
+app never deletes an application's files itself. A registered command is refused
+unless it is an absolute local `.exe` path or an MsiExec product code — shells,
+`del`, `format`, relative names and network shares are all blocked, and the status
+line says why.
+
+**Watch.** Folders you choose, each with an optional size budget. "Check now"
+measures them and marks any that are over budget. Nothing is measured in the
+background, and a watch never deletes or moves anything.
+
+**Scan history and a change view.** Every finished scan is recorded so the Watch
+page can show which folders grew, shrank, appeared or vanished since the previous
+scan of the same drive. Only aggregate figures and the top-level folders are
+stored — not your file names — and the history is capped at 60 entries.
+
+**Export.** The file list, the app list, duplicate groups, cleanup suggestions and
+cleanup reports can all be written as CSV or JSON. CSV output is guarded against
+spreadsheet formula injection: a value starting with `=`, `+`, `-` or `@` is
+prefixed with an apostrophe so a file named `=cmd|calc` cannot run when the report
+is opened. CSV files also get a UTF-8 BOM, without which Excel renders non-ASCII
+paths as mojibake.
 
 ### What it finds
 
@@ -188,7 +235,7 @@ or
 .venv\Scripts\python.exe -m unittest discover -s tests -t .
 ```
 
-254 tests. Engine tests use temporary directories and a fake recycler, so no real
+433 tests. Engine tests use temporary directories and a fake recycler, so no real
 file is ever touched. UI tests need PySide6 and run headless with
 `QT_QPA_PLATFORM=offscreen`.
 
@@ -228,6 +275,10 @@ space_analyzer/
     cleaner.py              delete_to_recycle and perform
     analyzer.py             build_suggestions
     rules.py                one function per cleanup item
+    apps.py                 installed-app inventory and the uninstall launcher
+    export.py               CSV and JSON writers, with formula-injection guards
+    history.py              scan snapshots and the delta between two of them
+    watches.py              watched folders, budgets and measurement
     ui/
         app.py              run() entry point
         state.py            shared Qt state
@@ -235,10 +286,11 @@ space_analyzer/
         theme.py            colours, fonts, stylesheet
         icons.py            sixteen vector icons painted in code
         widgets.py          gauge, segment bar, readouts, panels, page scroll
+        breakdown.py        file-type grouping behind the Large files bar
         main_window.py      rail navigation and status bar
-        dialogs.py          confirm() and show_reports()
+        dialogs.py          confirm(), show_reports() and ask_save_path()
         page_logic.py       pure rules behind the pages
-        pages/              the four pages
+        pages/              the six pages
 tests/                      unittest suite, one file per module
 docs/                       documentation
 assets/                     screenshots used in this README

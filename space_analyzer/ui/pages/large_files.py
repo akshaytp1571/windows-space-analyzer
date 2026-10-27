@@ -22,17 +22,19 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from space_analyzer import cleaner, system, util
-from space_analyzer.models import ActionReport, FileEntry
-from space_analyzer.ui import dialogs, icons, theme
+from space_analyzer import cleaner, export, system, util
+from space_analyzer.models import ActionReport, FileEntry, ScanNode, ScanResult
+from space_analyzer.ui import breakdown, dialogs, icons, theme
 from space_analyzer.ui import page_logic as logic
 from space_analyzer.ui.state import AppState
 from space_analyzer.ui.widgets import (
     EmptyState,
+    LegendRow,
     PageScroll,
     PageHeader,
     Panel,
     Readout,
+    SegmentBar,
     rule,
     set_role,
     split_bytes,
@@ -49,6 +51,18 @@ _MODIFIED_COLUMN = 3
 _AGE_COLUMN = 4
 _FOLDER_WIDTH = 380
 _OLD_FILE_DAYS = 365
+_BREAKDOWN_GROUPS = 6  # kinds shown before the rest are folded into "other"
+
+# One colour per kind, taken from the theme so the bar matches the rest of the app.
+# The accent comes first, because the largest kind should read as the signal.
+_BREAKDOWN_COLORS = (
+    theme.SIGNAL,
+    theme.COOL,
+    theme.WARN,
+    "#a78bfa",  # violet
+    "#f472b6",  # pink
+    "#34d399",  # mint
+)
 
 
 class _SortItem(QTableWidgetItem):
@@ -62,6 +76,27 @@ class _SortItem(QTableWidgetItem):
         if isinstance(other, _SortItem):
             return self.sort_key < other.sort_key
         return self.text() < other.text()
+
+
+def _scan_with(scan: ScanResult, files: list[FileEntry]) -> ScanResult:
+    """A copy of `scan` whose largest_files are only `files`.
+
+    The export writer takes a ScanResult, so the current filtered list is handed to
+    it as one. The tree is left empty because this export is about files, not
+    folders, and copying the whole tree would put every path into the report.
+    """
+    return ScanResult(
+        root=scan.root,
+        root_node=ScanNode(path=scan.root, name=scan.root, size=scan.total_size),
+        total_size=sum(entry.size for entry in files),
+        file_count=len(files),
+        dir_count=0,
+        largest_files=list(files),
+        skipped=list(scan.skipped),
+        error_count=scan.error_count,
+        cancelled=scan.cancelled,
+        elapsed_seconds=scan.elapsed_seconds,
+    )
 
 
 class LargeFilesPage(QWidget):
@@ -95,6 +130,19 @@ class LargeFilesPage(QWidget):
         self._read_total = Readout("Total size", color=theme.SIGNAL)
         self._read_old = Readout("Unchanged 1y+", color=theme.WARN)
 
+        # The breakdown shows what kinds of file make up the listed size. It is built
+        # from the largest-files list the scan already collected, so it costs nothing
+        # to populate and cannot stall the page.
+        self._break_bar = SegmentBar(height=22)
+        self._break_caption = set_role(QLabel(), "muted")
+        self._break_caption.setTextFormat(Qt.TextFormat.PlainText)
+        self._break_caption.setWordWrap(True)
+        self._break_legend = QWidget()
+        self._break_legend_layout = QVBoxLayout(self._break_legend)
+        self._break_legend_layout.setContentsMargins(0, 0, 0, 0)
+        self._break_legend_layout.setSpacing(2)
+        self._break_panel = self._build_breakdown_panel()
+
         self._table = self._build_table()
         self._empty = EmptyState(_NO_SCAN_HINT, "The list comes from the drive scans.", glyph="file")
         self._totals = set_role(QLabel(), "muted")
@@ -118,6 +166,12 @@ class LargeFilesPage(QWidget):
         self._move_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self._move_button.setEnabled(False)
         self._move_button.clicked.connect(self._move_selected)
+        self._export_button = QPushButton("Export list")
+        self._export_button.setIcon(icons.icon("stack", theme.TEXT_MUTED, 14))
+        self._export_button.setProperty("ghost", "true")
+        self._export_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._export_button.setEnabled(False)
+        self._export_button.clicked.connect(self._export_list)
 
         self._build_layout()
         self._drive_combo.currentIndexChanged.connect(self._refresh)
@@ -137,6 +191,51 @@ class LargeFilesPage(QWidget):
         worker.wait(_STOP_WAIT_MS)
 
     # ------------------------------------------------------------------ layout
+
+    def _build_breakdown_panel(self) -> Panel:
+        """Build the panel that splits the listed size by kind of file.
+
+        It sits above the table because it answers a different question: not "which
+        single file is biggest" but "what kind of thing is filling the drive".
+        """
+        panel = Panel(
+            title="By file type",
+            glyph="stack",
+            caption="what the listed files are — drawn from the scan, nothing re-read",
+            margins=(12, 10, 12, 10),
+        )
+        panel.add(self._break_caption)
+        panel.add(self._break_bar)
+        panel.add(self._break_legend)
+        return panel
+
+    def _update_breakdown(self, files: list[FileEntry]) -> None:
+        """Refill the type bar and its legend from the files currently listed."""
+        data = breakdown.breakdown(files, limit=_BREAKDOWN_GROUPS)
+        colors = _BREAKDOWN_COLORS
+        self._break_bar.set_segments(breakdown.segments(data, colors))
+        self._break_caption.setText(breakdown.summary_line(data))
+
+        # Rebuild the legend rows. Clearing the layout first stops repeat refreshes
+        # from stacking rows on top of each other.
+        while self._break_legend_layout.count():
+            item = self._break_legend_layout.takeAt(0)
+            widget = item.widget() if item is not None else None
+            if widget is not None:
+                widget.deleteLater()
+
+        shares = data.share_of
+        for index, group in enumerate(data.groups):
+            color = colors[index % len(colors)]
+            share = int(round(100 * shares.get(group.label, 0.0)))
+            row = LegendRow(
+                f"{group.label}  ({group.count})",
+                f"{util.format_bytes(group.size)}  ·  {share}%",
+                color,
+            )
+            self._break_legend_layout.addWidget(row)
+
+        self._break_panel.setVisible(bool(data.groups))
 
     def _build_table(self) -> QTableWidget:
         """Create the file table with its columns, selection rules, widths and sorting."""
@@ -202,6 +301,7 @@ class LargeFilesPage(QWidget):
         actions = QHBoxLayout()
         actions.setSpacing(9)
         actions.addWidget(self._status, 1)
+        actions.addWidget(self._export_button)
         actions.addWidget(self._open_button)
         actions.addWidget(self._move_button)
 
@@ -210,6 +310,7 @@ class LargeFilesPage(QWidget):
         layout.addWidget(header)
         layout.addLayout(filters)
         layout.addLayout(reads)
+        layout.addWidget(self._break_panel)
         layout.addWidget(panel, 1)
         layout.addLayout(actions)
 
@@ -257,6 +358,7 @@ class LargeFilesPage(QWidget):
                 is_hidden=is_hidden,
             )
         self._fill_table(rows)
+        self._update_breakdown(rows)
         if has_scans:
             self._update_totals()
         else:
@@ -343,6 +445,42 @@ class LargeFilesPage(QWidget):
         selected = len(self._selected_rows())
         self._open_button.setEnabled(has_scans and selected == 1)
         self._move_button.setEnabled(has_scans and selected > 0 and not self._busy)
+        self._export_button.setEnabled(has_scans and bool(self._sizes))
+
+    def _export_list(self) -> None:
+        """Write the current list to a CSV or JSON file the user chooses."""
+        scan = self._state.scans.get(self._drive_combo.currentText())
+        if scan is None:
+            return
+        path = dialogs.ask_save_path(
+            self, "Export the file list", export.default_name("large-files"), "CSV or JSON"
+        )
+        if not path:
+            return
+        try:
+            # Only the files currently listed are exported, so the report matches
+            # what the user is looking at rather than the whole scan.
+            export.write_scan(path, _scan_with(scan, self._listed_files()))
+        except OSError as exc:
+            self._status.setText(f"COULD NOT EXPORT — {exc}")
+            return
+        self._status.setText(f"EXPORTED — saved to {logic.shorten_path(path)}")
+
+    def _listed_files(self) -> list[FileEntry]:
+        """Every file currently shown in the table, in table order."""
+        result: list[FileEntry] = []
+        for row in range(self._table.rowCount()):
+            path = self._path_at(row)
+            if path is None:
+                continue
+            result.append(
+                FileEntry(
+                    path=path,
+                    size=self._sizes.get(path, 0),
+                    modified=self._modified.get(path, 0.0),
+                )
+            )
+        return result
 
     def _selected_rows(self) -> list[int]:
         """Row numbers with at least one selected cell, in table order."""

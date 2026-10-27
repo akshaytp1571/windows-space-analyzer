@@ -22,8 +22,10 @@ from space_analyzer import __version__, system
 from space_analyzer.ui import icons, theme
 from space_analyzer.ui.pages.duplicates import DuplicatesPage
 from space_analyzer.ui.pages.large_files import LargeFilesPage
+from space_analyzer.ui.pages.apps_page import AppsPage
 from space_analyzer.ui.pages.overview import OverviewPage
 from space_analyzer.ui.pages.suggestions import SuggestionsPage
+from space_analyzer.ui.pages.watch_page import WatchPage
 from space_analyzer.ui.state import AppState
 from space_analyzer.ui.widgets import RailNav, icon_label, set_role
 
@@ -34,6 +36,8 @@ _PAGES = (
     ("Suggestions", "spark", "What can be cleaned up, with the impact of each item"),
     ("Large files", "file", "The biggest files on a scanned drive"),
     ("Duplicates", "copy", "Identical files, grouped so you keep one copy"),
+    ("Apps", "stack", "Installed software, its recorded size, and its own uninstaller"),
+    ("Watch", "radar", "Folders to watch, size budgets, and what changed since last scan"),
 )
 
 
@@ -53,6 +57,8 @@ class MainWindow(QMainWindow):
             SuggestionsPage(state),
             LargeFilesPage(state),
             DuplicatesPage(state),
+            AppsPage(state),
+            WatchPage(state),
         ]
 
         self._rail = RailNav()

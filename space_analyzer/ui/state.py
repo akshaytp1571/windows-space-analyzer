@@ -14,12 +14,20 @@ class AppState(QObject):
 
     scans_changed = Signal()
     suggestions_changed = Signal()
+    admin_changed = Signal()
 
     def __init__(self, admin: bool = False, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self.admin: bool = admin
         self.scans: Dict[str, ScanResult] = {}
         self.suggestions: List[CleanupItem] = []
+
+    def set_admin(self, admin: bool) -> None:
+        """Record whether the app is elevated and notify the pages."""
+        if admin == self.admin:
+            return
+        self.admin = admin
+        self.admin_changed.emit()
 
     def set_scan(self, result: ScanResult) -> None:
         """Store the scan of one drive, keyed by its root, and notify the pages."""

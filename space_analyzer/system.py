@@ -327,6 +327,29 @@ def open_in_explorer(path: str) -> None:
         return  # Explorer failures are not actionable from here
 
 
+def spawn(args: list[str]) -> str | None:
+    """Start a program detached, with no shell and no window of ours.
+
+    Returns None when it started, or a reason when it did not. The argument list
+    goes straight to CreateProcess, so a registry value can never be re-parsed by
+    a shell. Used to launch a publisher's own uninstaller.
+    """
+    if not IS_WINDOWS:
+        return "Starting programs is only supported on Windows"
+    if not args or not args[0]:
+        return "No program to start"
+    try:
+        subprocess.Popen(
+            args,
+            shell=False,
+            close_fds=True,
+            creationflags=_CREATE_NO_WINDOW,
+        )
+    except OSError as exc:
+        return str(exc) or type(exc).__name__
+    return None
+
+
 def count_restore_points(drive_root: str) -> int | None:
     """Count the restore points (shadow copies) on a drive.
 
